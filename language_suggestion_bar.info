@@ -1,0 +1,5 @@
+name = Language Suggestion Bar
+description = TODO: Description of module
+package = Multilingual - Internationalization
+core = 7.x
+files[] = tests/language_suggestion_bar.test

@@ -1,0 +1,164 @@
+<?php
+
+/**
+ * @file language_suggestion_bar.module
+ * TODO: Enter file description here.
+ */
+
+/**
+ * Implements hook_theme().
+ */
+function language_suggestion_bar_theme() {
+  return array(
+    'language_suggestion_bar' => array(
+      'path' => drupal_get_path('module', 'language_suggestion_bar') . '/templates',
+      'template' => 'language-suggestion-bar',
+      'pattern' => 'language_suggestion_bar__',
+    ),
+  );
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function language_suggestion_bar_block_info() {
+  $blocks['language_suggestion_bar'] = array(
+    'info' => t('Language suggestion bar'),
+    'cache' => DRUPAL_NO_CACHE
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function language_suggestion_bar_block_view($delta = '') {
+  $block = array();
+
+  switch ($delta) {
+    case 'language_suggestion_bar':
+      $block['content'] = _language_suggestion_bar_block_callback();
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Block callback function.
+ *
+ * @return string
+ *   HTML for custom block.
+ */
+function _language_suggestion_bar_block_callback() {
+  if (drupal_multilingual()) {
+    global $language;
+
+    // Call validate function for suggestion bar.
+    $preference = language_suggestion_bar_validate($_SESSION, $language);
+    # $preference = 'es';
+
+    // if has preference language.
+    if ($preference) {
+      $path = drupal_is_front_page() ? '<front>' : $_GET['q'];
+      $all_language_links =  language_negotiation_get_switch_links('language', $path);
+      $links =  locale_language_switcher_url('language', $path);
+
+      $links_preference = $links[$preference];
+      $text = $text = t('Nós percebemos que você prefere a língua @language. Você gostaria de visitar nosso site em @language_name ?',
+       array('@language' => $preference, '@language_name' => $preference));
+
+      // Render yes link.
+      $attributes['class'][] = 'yes-link';
+      $yes_link = l(t('Yes', array(), array('langcode' => $preference)), $links_preference['href'], array('language' => $links_preference['language'], 'attributes' => $attributes));
+
+      // Theme variables.
+      $variables = array(
+        'text' => $text,
+        'yes_link' => $yes_link,
+        'no_link' => l(t('No', array(), array('langcode' => $preference)), 'javascript:void(0);', array('external' => TRUE)),
+      );
+
+      return theme('language_suggestion_bar', $variables);
+    }
+  }
+}
+
+/*****************************
+ **** Custom functions. ******
+ *****************************/
+
+/**
+ * Validate if show or not suggestion bar
+ *
+ * @param  array $session
+ *  User session array.
+ * @param  string $url
+ *  Current url.
+ * @return mixed
+ *   FALSE or prefernce language.
+ */
+function language_suggestion_bar_validate(&$session, $current_language) {
+  # unset($session['language_suggestion_bar']);
+
+  // Verify if has language in session.
+  if (!isset($session['language_suggestion_bar'])) {
+    // Verify if user access direct language.
+    if ($current_language->language != 'pt-br') {
+      $session['language_suggestion_bar'] = $current_language->language;
+      return FALSE;
+    }
+    else {
+      // Get use browser languages.
+      $user_languages = language_suggestion_bar_get_browser_languages();
+
+      $preference = language_suggestion_bar_preference($user_languages);
+      if ($preference) {
+        return $preference;
+      }
+      return FALSE;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Get prefernce language.
+ *
+ * @param array $user_languages
+ *   Browser user languages.
+ */
+function language_suggestion_bar_preference($user_languages) {
+  $site_languages = language_list();
+
+  if (!empty($user_languages)) {
+    foreach ($user_languages as $language => $weight) {
+      if (isset($site_languages[$language])) {
+        return $language;
+      }
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Return browser languages.
+ *
+ * @return array
+ *   Array containing current browsr langcodes.
+ */
+function language_suggestion_bar_get_browser_languages() {
+  $math = '@(?<=[, ]|^)([a-zA-Z-]+|\*)(?:;q=([0-9.]+))?(?:$|\s*,\s*)@';
+  preg_match_all($math, trim($_SERVER['HTTP_ACCEPT_LANGUAGE']), $matches, PREG_SET_ORDER);
+
+  foreach ($matches as $match) {
+    $langcode = strtolower($match[1]);
+    $qvalue = isset($match[2]) ? (float) $match[2] : 1;
+    $browser_langcodes[$langcode] = (int) ($qvalue * 1000);
+  }
+
+  return $browser_langcodes;
+}
+
+
+// @TODO - Nós percebemos que você prefere a língua @language. Você gostaria de visitar nosso site em @language_name ?
